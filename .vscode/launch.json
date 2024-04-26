@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run BitWhip",
+            "request": "launch",
+            "preLaunchTask" : "Build BitWhip (Release)",
+            "program": "${workspaceFolder}/target/release/bitwhip",
+            "windows": {
+                "environment": [
+                    {
+                        "name": "PATH",
+                        "value": "${env:Path};${workspaceFolder}/ext/ffmpeg-n7.0-latest-win64-gpl-shared-7.0/bin"
+                    }
+                ],
+            },
+            "cwd": "${workspaceFolder}",
+            "type":"cppvsdbg",
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "Debug BitWhip",
+            "request": "launch",
+            "preLaunchTask" : "Build BitWhip (Debug)",
+            "program": "${workspaceFolder}/target/debug/bitwhip",
+            "windows": {
+                "environment": [
+                    {
+                        "name": "PATH",
+                        "value": "${env:Path};${workspaceFolder}/ext/ffmpeg-n7.0-latest-win64-gpl-shared-7.0/bin"
+                    },
+                    {
+                        "name": "RUST_BACKTRACE",
+                        "value": "1"
+                    }
+                ],
+            },
+            "cwd": "${workspaceFolder}",
+            "type":"cppvsdbg",
+            "console": "integratedTerminal",
+        }
+    ]
+}

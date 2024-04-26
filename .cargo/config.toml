@@ -1,0 +1,4 @@
+[env]
+VCPKG_ROOT = { value = "ext/vcpkg", relative = true, force = true }
+FFMPEG_DIR = { value = "ext/ffmpeg-n7.0-latest-win64-gpl-shared-7.0", relative = true }
+OPENSSL_NO_VENDOR = "1"
