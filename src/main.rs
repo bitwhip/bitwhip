@@ -1,24 +1,17 @@
-use anyhow::{anyhow, bail, Error, Result};
-use bytes::Bytes;
+use anyhow::{Error, Result};
 use clap::{Parser, Subcommand};
 use encoder::Encoder;
 use ffmpeg_next::{
-    ffi::{self as ffmpeg_ffi, av_buffer_ref, AVBufferRef, AVPixelFormat},
-    filter,
-    format::Pixel,
-    frame, Frame, Packet, Rational,
+    ffi::{av_buffer_ref, AVBufferRef},
+    format::Pixel, Packet, Rational,
 };
-use futures::future::join;
-use log::{error, LevelFilter};
-use serde::{Deserialize, Serialize};
+use log::{LevelFilter};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use source::Source;
 use std::{
     collections::HashMap,
-    time::{Duration, Instant},
+    time::{Instant},
 };
-use tokio::task::JoinHandle;
-use tracing::instrument::WithSubscriber;
 
 mod client;
 mod encoder;
