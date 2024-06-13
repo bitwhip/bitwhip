@@ -82,7 +82,6 @@ impl Client {
         info!("local socket address: {:?}", socket.local_addr());
 
         // Discover host candidates
-
         let mut local_socket_addr = None;
         if let Ok(network_interfaces) = list_afinet_netifas() {
             for (name, ip) in network_interfaces {

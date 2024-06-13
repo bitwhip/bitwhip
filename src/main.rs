@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use crate::player::{Player};
 use clap::{Parser, Subcommand};
 use encoder::Encoder;
 use ffmpeg_next::{
@@ -12,8 +13,13 @@ use std::{
     collections::HashMap,
     time::{Instant},
 };
+use rouille::Server;
+use rouille::{Request, Response};
+use std::io::Read;
+
 
 mod client;
+mod player;
 mod encoder;
 mod source;
 mod whip;
@@ -77,6 +83,8 @@ enum Commands {
         /// The WHIP bearer token
         token: Option<String>,
     },
+
+    Play { },
 }
 
 #[tokio::main]
@@ -101,6 +109,7 @@ async fn main() -> Result<(), Error> {
 
     match args.commands {
         Commands::Stream { url, token } => stream(url, token).await?,
+        Commands::Play { } => play().await,
     }
 
     Ok(())
@@ -150,4 +159,24 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
     join_handle.await??;
 
     Ok(())
+}
+
+fn whip_handler(request: &Request) -> Response {
+    let mut data = request.data().expect("body to be available");
+    let mut buf = Vec::new();
+    match data.read_to_end(&mut buf) {
+        Ok(_) => (),
+        Err(_) => return Response::text("Failed to read body")
+    };
+
+    let player = Player::new(String::from_utf8(buf).expect("bytes should be valid utf8")).unwrap();
+    Response::from_data("application/sdp", player.answer)
+        .with_status_code(201)
+        .with_unique_header("Location", "/")
+}
+
+async fn play() {
+    println!("Listening for WHIP Requests on 0.0.0.0:1337");
+    let server = Server::new("0.0.0.0:1337", whip_handler).expect("starting the web server");
+    server.run();
 }
