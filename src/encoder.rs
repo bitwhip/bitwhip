@@ -1,8 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use ffmpeg::ffi::AVCodecContext;
-use ffmpeg::{
-    codec::Context as CodecContext, encoder::Video, Frame, Packet,
-};
+use ffmpeg::{codec::Context as CodecContext, encoder::Video, Frame, Packet};
 use ffmpeg_next as ffmpeg;
 use log::info;
 use std::{

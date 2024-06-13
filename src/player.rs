@@ -1,70 +1,118 @@
-use crate::client::{WebrtcError};
-use std::net::{IpAddr, SocketAddrV4};
+use crate::client::WebrtcError;
+use std::net::IpAddr;
 use std::{
-    net::SocketAddr,
-    time::{Duration},
+    io::ErrorKind,
+    net::UdpSocket,
+    thread,
+    time::{Duration, Instant},
 };
-
-use local_ip_address::list_afinet_netifas;
-use str0m::bwe::Bitrate;
 use str0m::{
-    Candidate, Rtc,
     change::SdpOffer,
+    net::{Protocol, Receive},
+    Candidate, Event, IceConnectionState, Input, Output, Rtc,
 };
-use std::net::UdpSocket;
+use systemstat::{Platform, System};
 
 pub struct Player {
-    rtc: Rtc,
     pub answer: String,
+}
+
+fn run(mut rtc: Rtc, socket: UdpSocket) {
+    let mut buf = Vec::new();
+    loop {
+        let timeout = match rtc.poll_output().expect("Ok") {
+            Output::Timeout(v) => v,
+            Output::Transmit(v) => {
+                socket.send_to(&v.contents, v.destination).expect("Ok");
+                continue;
+            }
+            Output::Event(v) => {
+                if v == Event::IceConnectionStateChange(IceConnectionState::Disconnected) {
+                    panic!("ICE has disconnected")
+                }
+                continue;
+            }
+        };
+
+        let timeout = timeout - Instant::now();
+        if timeout.is_zero() {
+            rtc.handle_input(Input::Timeout(Instant::now()))
+                .expect("Ok");
+            continue;
+        }
+
+        socket.set_read_timeout(Some(timeout)).expect("Ok");
+        buf.resize(2000, 0);
+
+        let input = match socket.recv_from(&mut buf) {
+            Ok((n, source)) => {
+                buf.truncate(n);
+                Input::Receive(
+                    Instant::now(),
+                    Receive {
+                        proto: Protocol::Udp,
+                        source,
+                        destination: socket.local_addr().unwrap(),
+                        contents: buf.as_slice().try_into().expect("Ok"),
+                    },
+                )
+            }
+
+            Err(e) => match e.kind() {
+                // Expected error for set_read_timeout(). One for windows, one for the rest.
+                ErrorKind::WouldBlock | ErrorKind::TimedOut => Input::Timeout(Instant::now()),
+                _ => panic!("{}", e),
+            },
+        };
+
+        rtc.handle_input(input).expect("Ok");
+    }
 }
 
 impl Player {
     pub fn new(offer: String) -> Result<Self, WebrtcError> {
-        let socket = UdpSocket::bind("0.0.0.0:0".parse::<SocketAddrV4>().unwrap())
-            .expect("Should bind udp socket");
-
         let mut rtc = Rtc::builder()
             .clear_codecs()
             .enable_h264(true)
             .set_rtp_mode(false)
             .set_stats_interval(Some(Duration::from_secs(2)))
-            .enable_bwe(Some(Bitrate::kbps(10000)))
             .build();
 
-        let mut local_socket_addr = None;
-        if let Ok(network_interfaces) = list_afinet_netifas() {
-            for (name, ip) in network_interfaces {
-                match ip {
-                    IpAddr::V4(ip4) => {
-                        if !ip4.is_loopback() && !ip4.is_link_local() {
-                            let socket_addr =
-                                SocketAddr::new(ip, socket.local_addr().unwrap().port());
-                            local_socket_addr = Some(socket_addr.clone());
-                            rtc.add_local_candidate(
-                                Candidate::host(socket_addr, str0m::net::Protocol::Udp)
-                                    .expect("Failed to create local candidate"),
-                            );
-                        }
-                    }
-                    IpAddr::V6(_ip6) => {}
-                }
-            }
-        } else {
-            return Err(WebrtcError::NoCandidates);
-        }
+        let host_addr = select_host_address();
 
-        let Some(local_socket_addr) = local_socket_addr else {
-            return Err(WebrtcError::NoCandidates);
-        };
+        let socket = UdpSocket::bind(format!("{host_addr}:0")).expect("binding a random UDP port");
+        let addr = socket.local_addr().expect("a local socket adddress");
+        let candidate = Candidate::host(addr, "udp").expect("a host candidate");
+        rtc.add_local_candidate(candidate);
 
         let offer = SdpOffer::from_sdp_string(&offer).map_err(|_| WebrtcError::SdpError)?;
         if let Ok(answer) = rtc.sdp_api().accept_offer(offer) {
+            thread::spawn(|| {
+                run(rtc, socket);
+            });
+
             return Ok(Self {
                 answer: answer.to_sdp_string(),
-                rtc,
-            })
+            });
         }
 
         return Err(WebrtcError::SdpError);
     }
+}
+
+pub fn select_host_address() -> IpAddr {
+    let system = System::new();
+    let networks = system.networks().unwrap();
+
+    for net in networks.values() {
+        for n in &net.addrs {
+            if let systemstat::IpAddr::V4(v) = n.addr {
+                if !v.is_loopback() && !v.is_link_local() && !v.is_broadcast() {
+                    return IpAddr::V4(v);
+                }
+            }
+        }
+    }
+
+    panic!("Found no usable network interface");
 }

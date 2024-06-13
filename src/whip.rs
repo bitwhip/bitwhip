@@ -1,7 +1,7 @@
 use crate::client::{Client, Direction, WebrtcEvent};
 use crate::EncodedPacket;
-use bytes::{Bytes};
-use std::{time::Instant};
+use bytes::Bytes;
+use std::time::Instant;
 use tokio::sync::mpsc::{error::TryRecvError, UnboundedReceiver};
 use tracing::{error, info};
 

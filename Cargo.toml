@@ -29,3 +29,4 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 ] }
 url = "2.5.0"
 rouille = "3.6.2"
+systemstat = "0.2.3"

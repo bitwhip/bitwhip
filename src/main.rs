@@ -1,26 +1,23 @@
+use crate::player::Player;
 use anyhow::{Error, Result};
-use crate::player::{Player};
 use clap::{Parser, Subcommand};
 use encoder::Encoder;
 use ffmpeg_next::{
     ffi::{av_buffer_ref, AVBufferRef},
-    format::Pixel, Packet, Rational,
+    format::Pixel,
+    Packet, Rational,
 };
-use log::{LevelFilter};
-use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
-use source::Source;
-use std::{
-    collections::HashMap,
-    time::{Instant},
-};
+use log::LevelFilter;
 use rouille::Server;
 use rouille::{Request, Response};
+use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use source::Source;
 use std::io::Read;
-
+use std::{collections::HashMap, time::Instant};
 
 mod client;
-mod player;
 mod encoder;
+mod player;
 mod source;
 mod whip;
 
@@ -84,7 +81,7 @@ enum Commands {
         token: Option<String>,
     },
 
-    Play { },
+    Play {},
 }
 
 #[tokio::main]
@@ -109,7 +106,7 @@ async fn main() -> Result<(), Error> {
 
     match args.commands {
         Commands::Stream { url, token } => stream(url, token).await?,
-        Commands::Play { } => play().await,
+        Commands::Play {} => play().await,
     }
 
     Ok(())
@@ -166,7 +163,7 @@ fn whip_handler(request: &Request) -> Response {
     let mut buf = Vec::new();
     match data.read_to_end(&mut buf) {
         Ok(_) => (),
-        Err(_) => return Response::text("Failed to read body")
+        Err(_) => return Response::text("Failed to read body"),
     };
 
     let player = Player::new(String::from_utf8(buf).expect("bytes should be valid utf8")).unwrap();
