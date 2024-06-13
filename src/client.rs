@@ -129,15 +129,6 @@ impl Client {
 
         // Add receive tracks and generate an offer
         let mut change = self.rtc.sdp_api();
-
-        // TODO: Stream ID and Track ID should be UUIDs or something
-        // self.audio_mid = Some(change.add_media(
-        //     MediaKind::Audio,
-        //     direction,
-        //     Some("audio_0".to_string()),
-        //     Some("audio_0".to_string()),
-        // ));
-
         self.video_mid = Some(change.add_media(
             MediaKind::Video,
             direction,
@@ -369,32 +360,6 @@ impl Client {
                         frame_data,
                     )
                     .map_err(|e| WebrtcError::SendError(e.to_string()))?;
-            }
-        } else {
-            warn!("trying to send video without mid");
-        }
-        Ok(())
-    }
-
-    pub fn _send_audio(&mut self, frame_data: Bytes, pts: Duration) -> Result<(), WebrtcError> {
-        if let Some(mid) = self._audio_mid {
-            let params = &self
-                .rtc
-                .codec_config()
-                .find(|p| p.spec().codec == Codec::Opus)
-                .cloned()
-                .unwrap();
-            if let Some(writer) = self.rtc.writer(mid) {
-                let freq = params.spec().clock_rate;
-                let media_time: MediaTime = pts.into();
-                writer
-                    .write(
-                        params.pt(),
-                        Instant::now(),
-                        media_time.rebase(freq),
-                        frame_data,
-                    )
-                    .map_err(|e| WebrtcError::WebrtcError(e.into()))?;
             }
         } else {
             warn!("trying to send video without mid");

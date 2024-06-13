@@ -44,12 +44,6 @@ pub async fn publish(
                             Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
                             Ok(packet) => {
                                 let pts = Instant::now() - packet.1;
-                                // let nal_units = find_nal_units(&packet.0.data);
-                                // for nalu in nal_units {
-                                //     if nalu[4] & 0b11111 == 7 {
-                                //         info!("KEY FRAME!!!!!!!");
-                                //     }
-                                // }
                                 if let Some(data) = packet.0.data() {
                                     client
                                         .send_video(Bytes::copy_from_slice(data), pts)
