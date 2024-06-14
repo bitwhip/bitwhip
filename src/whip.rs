@@ -26,14 +26,14 @@ pub async fn publish(
         match client.recv().await {
             Ok(event) => match event {
                 WebrtcEvent::Connected => {
-                    info!("[WhepClient] connected");
+                    info!("connected");
                 }
                 WebrtcEvent::Disconnected => {
-                    info!("[WhepClient] disconnected");
+                    info!("disconnected");
                     break;
                 }
                 WebrtcEvent::Stats(stats) => {
-                    info!("[WhepClient] stats: {:?}", stats);
+                    info!("stats: {:?}", stats);
                 }
                 WebrtcEvent::Continue => {
                     // Here we should be clear to write data
@@ -56,7 +56,7 @@ pub async fn publish(
                 }
             },
             Err(err) => {
-                error!("[WhepClient] error: {:?}", err);
+                error!("error: {:?}", err);
                 break;
             }
         }
@@ -72,21 +72,21 @@ pub fn subscribe(offer: String) -> String {
              match client.recv().await {
                  Ok(event) => match event {
                      WebrtcEvent::Connected => {
-                         info!("[WhepClient] connected");
+                         info!("connected");
                      }
                      WebrtcEvent::Disconnected => {
-                         info!("[WhepClient] disconnected");
+                         info!("disconnected");
                          break;
                      }
                      WebrtcEvent::Stats(stats) => {
-                         info!("[WhepClient] stats: {:?}", stats);
+                         info!("stats: {:?}", stats);
                      }
                      WebrtcEvent::Continue => {
-                         info!("[WhepClient] Continue");
+                         info!("Continue");
                      }
                  },
                  Err(err) => {
-                     error!("[WhepClient] error: {:?}", err);
+                     error!("error: {:?}", err);
                      break;
                  }
              }

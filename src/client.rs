@@ -229,7 +229,7 @@ impl Client {
                     return Ok(WebrtcEvent::Connected);
                 }
                 Event::IceConnectionStateChange(state) => {
-                    info!("[WhepClient] ice connection state change: {:?}", state);
+                    info!("ice connection state change: {:?}", state);
                     match state {
                         IceConnectionState::Disconnected => return Ok(WebrtcEvent::Disconnected),
                         _ => return Ok(WebrtcEvent::Continue),
@@ -281,7 +281,7 @@ impl Client {
             return match self.rtc.handle_input(Input::Timeout(Instant::now())) {
                 Ok(_) => Ok(WebrtcEvent::Continue),
                 Err(e) => {
-                    error!("[WhepClient] error handle input rtc: {:?}", e);
+                    error!("error handle input rtc: {:?}", e);
                     Ok(WebrtcEvent::Continue)
                 }
             };
