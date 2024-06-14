@@ -1,6 +1,7 @@
-use crate::client::{Client, Direction, WebrtcEvent};
+use crate::client::{Client, WebrtcEvent};
 use crate::EncodedPacket;
 use bytes::Bytes;
+use futures::executor;
 use std::time::Instant;
 use tokio::sync::mpsc::{error::TryRecvError, UnboundedReceiver};
 use tracing::{error, info};
@@ -11,13 +12,13 @@ pub async fn publish(
     mut packet_rx: UnboundedReceiver<EncodedPacket>,
 ) {
     info!(
-        "creating WHEP client to push to {} with token: {:?}",
+        "creating client to push to {} with token: {:?}",
         publish_url, token
     );
 
-    let mut client = Client::new(&publish_url, &token).await.unwrap(); // TODO error handling
+    let mut client = Client::new().await.unwrap();
     client
-        .prepare(Direction::Publish)
+        .send_whip_request(&publish_url, &token)
         .await
         .expect("should connect");
 
@@ -60,4 +61,37 @@ pub async fn publish(
             }
         }
     }
+}
+
+pub fn subscribe(offer: String) -> String {
+    let mut client = executor::block_on(Client::new()).expect("Ok");
+    let answer = client.accept_whip_request(offer).expect("Ok");
+
+    tokio::task::spawn(async move {
+         loop {
+             match client.recv().await {
+                 Ok(event) => match event {
+                     WebrtcEvent::Connected => {
+                         info!("[WhepClient] connected");
+                     }
+                     WebrtcEvent::Disconnected => {
+                         info!("[WhepClient] disconnected");
+                         break;
+                     }
+                     WebrtcEvent::Stats(stats) => {
+                         info!("[WhepClient] stats: {:?}", stats);
+                     }
+                     WebrtcEvent::Continue => {
+                         info!("[WhepClient] Continue");
+                     }
+                 },
+                 Err(err) => {
+                     error!("[WhepClient] error: {:?}", err);
+                     break;
+                 }
+             }
+         }
+    });
+
+    answer
 }

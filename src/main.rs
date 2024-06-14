@@ -1,5 +1,5 @@
-use crate::player::Player;
 use anyhow::{Error, Result};
+use axum::{response::Response, routing::post, Router};
 use clap::{Parser, Subcommand};
 use encoder::Encoder;
 use ffmpeg_next::{
@@ -8,16 +8,12 @@ use ffmpeg_next::{
     Packet, Rational,
 };
 use log::LevelFilter;
-use rouille::Server;
-use rouille::{Request, Response};
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use source::Source;
-use std::io::Read;
 use std::{collections::HashMap, time::Instant};
 
 mod client;
 mod encoder;
-mod player;
 mod source;
 mod whip;
 
@@ -158,22 +154,22 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn whip_handler(request: &Request) -> Response {
-    let mut data = request.data().expect("body to be available");
-    let mut buf = Vec::new();
-    match data.read_to_end(&mut buf) {
-        Ok(_) => (),
-        Err(_) => return Response::text("Failed to read body"),
-    };
+async fn whip_handler(offer: String) -> Response<String> {
+    let answer = whip::subscribe(offer);
 
-    let player = Player::new(String::from_utf8(buf).expect("bytes should be valid utf8")).unwrap();
-    Response::from_data("application/sdp", player.answer)
-        .with_status_code(201)
-        .with_unique_header("Location", "/")
+    Response::builder()
+        .status(201)
+        .header("Location", "/")
+        .body(answer)
+        .unwrap()
 }
 
 async fn play() {
     println!("Listening for WHIP Requests on 0.0.0.0:1337");
-    let server = Server::new("0.0.0.0:1337", whip_handler).expect("starting the web server");
-    server.run();
+    axum::serve(
+        tokio::net::TcpListener::bind("0.0.0.0:1337").await.unwrap(),
+        Router::new().route("/", post(whip_handler)),
+    )
+    .await
+    .unwrap();
 }

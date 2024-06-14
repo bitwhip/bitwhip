@@ -1,23 +1,20 @@
-use std::net::{IpAddr, SocketAddrV4};
-use std::{
-    error::Error,
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
-
 use bytes::Bytes;
 use local_ip_address::list_afinet_netifas;
 use reqwest::header::{HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use serde::Deserialize;
-use std::str::FromStr;
+use std::{
+    error::Error,
+    net::{IpAddr, SocketAddr, SocketAddrV4},
+    str::FromStr,
+    time::{Duration, Instant},
+};
 use str0m::bwe::Bitrate;
-use str0m::media::MediaTime;
-use str0m::stats::PeerStats;
 use str0m::{
-    change::SdpAnswer,
+    change::{SdpAnswer, SdpOffer},
     format::Codec,
-    media::{Direction as RtcDirection, MediaKind, Mid},
+    media::{Direction as RtcDirection, MediaKind, MediaTime, Mid},
     net::{Protocol, Receive},
+    stats::PeerStats,
     Candidate, Event, IceConnectionState, Input, Output, Rtc,
 };
 use tokio::net::UdpSocket;
@@ -38,12 +35,6 @@ pub enum WebrtcEvent {
 }
 
 #[derive(Debug)]
-pub enum Direction {
-    Publish,
-    _Subscribe,
-}
-
-#[derive(Debug)]
 pub enum WebrtcError {
     ServerError(Box<dyn Error + Send + Sync>),
     SdpError,
@@ -57,15 +48,13 @@ pub struct Client {
     rtc: Rtc,
     socket: UdpSocket,
     local_socket_addr: SocketAddr,
-    url: String,
-    token: Option<String>,
     buf: [u8; 1500],
     video_mid: Option<Mid>,
     _audio_mid: Option<Mid>,
 }
 
 impl Client {
-    pub async fn new(url: &str, token: &Option<String>) -> Result<Self, WebrtcError> {
+    pub async fn new() -> Result<Self, WebrtcError> {
         let socket = UdpSocket::bind("0.0.0.0:0".parse::<SocketAddrV4>().unwrap())
             .await
             .expect("Should bind udp socket");
@@ -113,25 +102,22 @@ impl Client {
             socket,
             local_socket_addr,
             rtc,
-            url: url.to_string(),
-            token: token.to_owned(),
             buf: [0; 1500],
             video_mid: None,
             _audio_mid: None,
         })
     }
 
-    pub async fn prepare(&mut self, direction: Direction) -> Result<(), WebrtcError> {
-        let direction = match direction {
-            Direction::Publish => RtcDirection::SendOnly,
-            Direction::_Subscribe => RtcDirection::RecvOnly,
-        };
-
+    pub async fn send_whip_request(
+        &mut self,
+        url: &str,
+        token: &Option<String>,
+    ) -> Result<(), WebrtcError> {
         // Add receive tracks and generate an offer
         let mut change = self.rtc.sdp_api();
         self.video_mid = Some(change.add_media(
             MediaKind::Video,
-            direction,
+            RtcDirection::SendOnly,
             Some("video_0".to_string()),
             Some("video_0".to_string()),
         ));
@@ -140,12 +126,12 @@ impl Client {
 
         let offer_str = offer.to_sdp_string();
         info!("offer: {}", offer_str);
-        info!("token: {:?}", self.token);
-        info!("url: {}", self.url);
+        info!("token: {:?}", token);
+        info!("url: {}", url);
 
         let mut headers = reqwest::header::HeaderMap::new();
 
-        if let Some(token) = &self.token {
+        if let Some(token) = &token {
             let authoriation_value = HeaderValue::from_str(&format!("Bearer {}", token))
                 .map_err(|e| WebrtcError::ServerError(e.into()))?;
             headers.append(AUTHORIZATION, authoriation_value);
@@ -168,7 +154,7 @@ impl Client {
             .map_err(|e| WebrtcError::ServerError(e.into()))?;
 
         let mut next_url =
-            reqwest::Url::from_str(&self.url).map_err(|e| WebrtcError::ServerError(e.into()))?;
+            reqwest::Url::from_str(&url).map_err(|e| WebrtcError::ServerError(e.into()))?;
         let res = loop {
             let response = client
                 .post(next_url.clone())
@@ -220,6 +206,15 @@ impl Client {
             .map_err(|_| WebrtcError::SdpError)?;
 
         Ok(())
+    }
+
+    pub fn accept_whip_request(&mut self, offer: String) -> Result<String, WebrtcError> {
+        let offer = SdpOffer::from_sdp_string(&offer).map_err(|_| WebrtcError::SdpError)?;
+        if let Ok(answer) = self.rtc.sdp_api().accept_offer(offer) {
+            return Ok(answer.to_sdp_string());
+        }
+
+        return Err(WebrtcError::SdpError);
     }
 
     pub async fn recv<'a>(&mut self) -> Result<WebrtcEvent, WebrtcError> {
