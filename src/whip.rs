@@ -2,6 +2,7 @@ use crate::client::{Client, WebrtcEvent};
 use crate::EncodedPacket;
 use bytes::Bytes;
 use futures::executor;
+use ffmpeg_next;
 use std::time::Instant;
 use tokio::sync::mpsc::{error::TryRecvError, UnboundedReceiver};
 use tracing::{error, info};
@@ -35,6 +36,9 @@ pub async fn publish(
                 WebrtcEvent::Stats(stats) => {
                     info!("stats: {:?}", stats);
                 }
+                WebrtcEvent::Media(media) => {
+                    info!("media: {:?}", media);
+                }
                 WebrtcEvent::Continue => {
                     // Here we should be clear to write data
                     // flush any media samples between the last sample index and the
@@ -66,31 +70,42 @@ pub async fn publish(
 pub fn subscribe(offer: String) -> String {
     let mut client = executor::block_on(Client::new()).expect("Ok");
     let answer = client.accept_whip_request(offer).expect("Ok");
-
+    
     tokio::task::spawn(async move {
-         loop {
-             match client.recv().await {
-                 Ok(event) => match event {
-                     WebrtcEvent::Connected => {
-                         info!("connected");
-                     }
-                     WebrtcEvent::Disconnected => {
-                         info!("disconnected");
-                         break;
-                     }
-                     WebrtcEvent::Stats(stats) => {
-                         info!("stats: {:?}", stats);
-                     }
-                     WebrtcEvent::Continue => {
-                         info!("Continue");
-                     }
-                 },
-                 Err(err) => {
-                     error!("error: {:?}", err);
-                     break;
-                 }
-             }
-         }
+        let codec = ffmpeg_next::decoder::find_by_name("h264").expect("H264 Decoder Available");
+        let context = ffmpeg_next::codec::context::Context::new_with_codec(codec);
+        let mut decoder = context.decoder().video().expect("Decoder init correctly");
+
+        loop {
+            match client.recv().await {
+                Ok(event) => match event {
+                    WebrtcEvent::Connected => {
+                        info!("connected");
+                    }
+                    WebrtcEvent::Disconnected => {
+                        info!("disconnected");
+                        break;
+                    }
+                    WebrtcEvent::Stats(stats) => {
+                        info!("stats: {:?}", stats);
+                    }
+                    WebrtcEvent::Media(media) => {
+                        decoder.send_packet(&ffmpeg_next::Packet::copy(&media.data)).expect("Send packet should succeed");
+                        let mut frame = ffmpeg_next::frame::Video::empty();
+                        while decoder.receive_frame(&mut frame).is_ok() {
+                            println!("frame");
+                        }
+                    }
+                    WebrtcEvent::Continue => {
+                        info!("Continue");
+                    }
+                },
+                Err(err) => {
+                    error!("error: {:?}", err);
+                    break;
+                }
+            }
+        }
     });
 
     answer

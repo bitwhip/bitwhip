@@ -8,11 +8,10 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-use str0m::bwe::Bitrate;
 use str0m::{
     change::{SdpAnswer, SdpOffer},
     format::Codec,
-    media::{Direction as RtcDirection, MediaKind, MediaTime, Mid},
+    media::{Direction as RtcDirection, MediaData, MediaKind, MediaTime, Mid},
     net::{Protocol, Receive},
     stats::PeerStats,
     Candidate, Event, IceConnectionState, Input, Output, Rtc,
@@ -31,6 +30,7 @@ pub enum WebrtcEvent {
     Continue,
     Connected,
     Stats(PeerStats),
+    Media(MediaData),
     Disconnected,
 }
 
@@ -62,10 +62,7 @@ impl Client {
         let mut rtc = Rtc::builder()
             .clear_codecs()
             .enable_h264(true)
-            // .enable_opus(true)
-            .set_rtp_mode(false)
             .set_stats_interval(Some(Duration::from_secs(2)))
-            .enable_bwe(Some(Bitrate::kbps(10000)))
             .build();
 
         info!("local socket address: {:?}", socket.local_addr());
@@ -246,9 +243,8 @@ impl Client {
                 Event::PeerStats(stats) => {
                     return Ok(WebrtcEvent::Stats(stats));
                 }
-                Event::RtpPacket(pkt) => {
-                    trace!("rtp packet: {:?}", pkt);
-                    return Ok(WebrtcEvent::Continue);
+                Event::MediaData(media) => {
+                    return Ok(WebrtcEvent::Media(media));
                 }
                 Event::MediaAdded(media) => {
                     info!("Media Added: {:?}", media);
