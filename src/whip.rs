@@ -62,7 +62,7 @@ pub async fn publish(
     }
 }
 
-pub fn subscribe(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String) -> String {
+pub fn subscribe(tx: mpsc::Sender<Vec<u8>>, offer: String) -> String {
     let mut client = executor::block_on(Client::new()).expect("Ok");
     let answer = client.accept_whip_request(offer).expect("Ok");
 
@@ -91,19 +91,29 @@ pub fn subscribe(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String) -> 
 
                         let mut frame = ffmpeg_next::frame::Video::empty();
                         while decoder.receive_frame(&mut frame).is_ok() {
-                            let mut rgb_frame = ffmpeg_next::frame::Video::empty();
-                            let mut scaler = ffmpeg_next::software::scaling::context::Context::get(
-                                frame.format(),
-                                frame.width(),
-                                frame.height(),
-                                ffmpeg_next::format::Pixel::RGB24,
-                                frame.width(),
-                                frame.height(),
-                                ffmpeg_next::software::scaling::flag::Flags::BILINEAR,
-                            )
-                            .expect("Init Scaler");
-                            scaler.run(&frame, &mut rgb_frame).expect("scaled");
-                            tx.send(rgb_frame).expect("pushed");
+                            unsafe {
+                                let buffer_size = ffmpeg_sys_next::av_image_get_buffer_size(
+                                    frame.format().into(),
+                                    frame.width() as i32,
+                                    frame.height() as i32,
+                                    32,
+                                );
+                                let mut buffer = vec![0; buffer_size as usize];
+
+                                let frame_ptr = *frame.as_ptr();
+                                ffmpeg_sys_next::av_image_copy_to_buffer(
+                                    buffer.as_mut_ptr(),
+                                    buffer_size,
+                                    frame_ptr.data.as_ptr() as *mut _,
+                                    frame_ptr.linesize.as_ptr() as *mut _,
+                                    frame.format().into(),
+                                    frame_ptr.width,
+                                    frame_ptr.height,
+                                    32,
+                                );
+
+                                tx.send(buffer).expect("pushed");
+                            }
                         }
                     }
                     WebrtcEvent::Continue => {

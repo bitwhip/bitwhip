@@ -418,6 +418,7 @@ dependencies = [
  "bytes",
  "clap",
  "ffmpeg-next",
+ "ffmpeg-sys-next",
  "futures",
  "jwt",
  "local-ip-address",
