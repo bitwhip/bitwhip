@@ -86,7 +86,7 @@ pub fn subscribe(tx: mpsc::Sender<Vec<u8>>, offer: String) -> String {
                     }
                     WebrtcEvent::Media(media) => {
                         decoder
-                            .send_packet(&ffmpeg_next::Packet::copy(&media.data))
+                            .send_packet(&ffmpeg_next::Packet::borrow(&media.data))
                             .expect("Send packet should succeed");
 
                         let mut frame = ffmpeg_next::frame::Video::empty();
