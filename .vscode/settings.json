@@ -1,8 +1,0 @@
-{
-    "[rust]": {
-        "editor.formatOnSave": true
-    },
-    "[toml]": {
-        "editor.formatOnSave": true
-    }
-}
