@@ -1,3 +1,4 @@
+use crate::player::render_video;
 use anyhow::{Error, Result};
 use axum::{response::Response, routing::post, Router};
 use clap::{Parser, Subcommand};
@@ -10,10 +11,11 @@ use ffmpeg_next::{
 use log::LevelFilter;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use source::Source;
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, sync::mpsc, time::Instant};
 
 mod client;
 mod encoder;
+mod player;
 mod source;
 mod whip;
 
@@ -83,6 +85,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     ffmpeg_next::init()?;
+    // ffmpeg_next::util::log::set_level(ffmpeg_next::util::log::Level::Debug);
 
     let args = Cli::parse();
 
@@ -154,9 +157,11 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
     Ok(())
 }
 
-async fn whip_handler(offer: String) -> Response<String> {
-    let answer = whip::subscribe(offer);
-
+async fn whip_handler(
+    tx: mpsc::Sender<ffmpeg_next::frame::Video>,
+    offer: String,
+) -> Response<String> {
+    let answer = whip::subscribe(tx, offer);
     Response::builder()
         .status(201)
         .header("Location", "/")
@@ -166,10 +171,19 @@ async fn whip_handler(offer: String) -> Response<String> {
 
 async fn play() {
     println!("Listening for WHIP Requests on 0.0.0.0:1337");
-    axum::serve(
-        tokio::net::TcpListener::bind("0.0.0.0:1337").await.unwrap(),
-        Router::new().route("/", post(whip_handler)),
-    )
-    .await
-    .unwrap();
+    let (tx, rx): (
+        mpsc::Sender<ffmpeg_next::frame::Video>,
+        mpsc::Receiver<ffmpeg_next::frame::Video>,
+    ) = mpsc::channel();
+
+    tokio::task::spawn(async move {
+        axum::serve(
+            tokio::net::TcpListener::bind("0.0.0.0:1337").await.unwrap(),
+            Router::new().route("/", post(move |offer: String| whip_handler(tx, offer))),
+        )
+        .await
+        .unwrap();
+    });
+
+    render_video(rx);
 }
