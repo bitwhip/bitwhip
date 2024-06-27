@@ -110,12 +110,13 @@ impl Client {
         &mut self,
         url: &str,
         token: &Option<String>,
+        direction: RtcDirection,
     ) -> Result<(), WebrtcError> {
         // Add receive tracks and generate an offer
         let mut change = self.rtc.sdp_api();
         self.video_mid = Some(change.add_media(
             MediaKind::Video,
-            RtcDirection::SendOnly,
+            direction,
             Some("video_0".to_string()),
             Some("video_0".to_string()),
         ));
@@ -135,10 +136,12 @@ impl Client {
             headers.append(AUTHORIZATION, authoriation_value);
         }
 
-        headers.append(CONTENT_TYPE, HeaderValue::from_str("application/sdp").unwrap());
+        headers.append(
+            CONTENT_TYPE,
+            HeaderValue::from_str("application/sdp").unwrap(),
+        );
         headers.append(ACCEPT, HeaderValue::from_str("application/sdp").unwrap());
         headers.append(USER_AGENT, HeaderValue::from_str("bitwhip").unwrap());
-
 
         let client = reqwest::Client::builder()
             .default_headers(headers)
@@ -189,10 +192,12 @@ impl Client {
             .await
             .map_err(|e| WebrtcError::ServerError(e.into()))?;
 
-
         self.rtc
             .sdp_api()
-            .accept_answer(pending, SdpAnswer::from_sdp_string(&answer).map_err(|_| WebrtcError::SdpError)?)
+            .accept_answer(
+                pending,
+                SdpAnswer::from_sdp_string(&answer).map_err(|_| WebrtcError::SdpError)?,
+            )
             .map_err(|_| WebrtcError::SdpError)?;
 
         Ok(())
@@ -303,12 +308,12 @@ impl Client {
                 )
             }
             Ok(Err(e)) => match e.kind() {
-                ErrorKind::ConnectionReset =>return Ok(WebrtcEvent::Continue),
+                ErrorKind::ConnectionReset => return Ok(WebrtcEvent::Continue),
                 _ => {
-                 error!("[TransportWebrtc] network error {:?}", e);
-                return Err(WebrtcError::NetworkError(e.into()));
-               }
-            }
+                    error!("[TransportWebrtc] network error {:?}", e);
+                    return Err(WebrtcError::NetworkError(e.into()));
+                }
+            },
             Err(_e) => {
                 // Expected error for set_read_timeout().
                 // One for windows, one for the rest.

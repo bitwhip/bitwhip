@@ -79,16 +79,25 @@ enum Commands {
         token: Option<String>,
     },
 
-    Play {},
+    /// Start a WHIP server that accepts incoming requests
+    PlayWHIP {},
+
+    /// Play from a WHEP destination
+    #[command(arg_required_else_help = true)]
+    PlayWHEP {
+        /// The WHEP URL
+        url: String,
+
+        /// The WHEP bearer token
+        token: Option<String>,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     ffmpeg_next::init()?;
-    // ffmpeg_next::util::log::set_level(ffmpeg_next::util::log::Level::Debug);
 
     let args = Cli::parse();
-
     let level_filter = match args.verbose {
         0 => LevelFilter::Warn,
         1 => LevelFilter::Info,
@@ -105,7 +114,8 @@ async fn main() -> Result<(), Error> {
 
     match args.commands {
         Commands::Stream { url, token } => stream(url, token).await?,
-        Commands::Play {} => play().await,
+        Commands::PlayWHIP {} => play_whip().await,
+        Commands::PlayWHEP { url, token } => play_whep(url, token).await?,
     }
 
     Ok(())
@@ -151,14 +161,13 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
     });
 
     whip::publish(&url, token, rx).await;
-
     join_handle.await??;
 
     Ok(())
 }
 
 async fn whip_handler(tx: mpsc::Sender<Vec<u8>>, offer: String) -> Response<String> {
-    let answer = whip::subscribe(tx, offer);
+    let answer = whip::subscribe_as_server(tx, offer);
     Response::builder()
         .status(201)
         .header("Location", "/")
@@ -166,7 +175,7 @@ async fn whip_handler(tx: mpsc::Sender<Vec<u8>>, offer: String) -> Response<Stri
         .unwrap()
 }
 
-async fn play() {
+async fn play_whip() {
     println!("Listening for WHIP Requests on 0.0.0.0:1337");
     let (tx, rx): (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>) = mpsc::channel();
 
@@ -180,4 +189,13 @@ async fn play() {
     });
 
     render_video(rx);
+}
+
+async fn play_whep(url: String, token: Option<String>) -> Result<()> {
+    let (tx, rx): (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>) = mpsc::channel();
+
+    whip::subscribe_as_client(tx, &url, token).await;
+    render_video(rx);
+
+    Ok(())
 }
