@@ -57,7 +57,7 @@ pub async fn publish(
     }
 }
 
-pub async fn decode_recv_loop(mut client: Client, tx: mpsc::Sender<Vec<u8>>) {
+pub async fn decode_recv_loop(mut client: Client, tx: mpsc::Sender<ffmpeg_next::frame::Video>) {
     let codec = ffmpeg_next::decoder::find_by_name("h264").expect("H264 Decoder Available");
     let context = ffmpeg_next::codec::context::Context::new_with_codec(codec);
     let mut decoder = context.decoder().video().expect("Decoder init correctly");
@@ -78,29 +78,8 @@ pub async fn decode_recv_loop(mut client: Client, tx: mpsc::Sender<Vec<u8>>) {
 
                     let mut frame = ffmpeg_next::frame::Video::empty();
                     while decoder.receive_frame(&mut frame).is_ok() {
-                        unsafe {
-                            let buffer_size = ffmpeg_sys_next::av_image_get_buffer_size(
-                                frame.format().into(),
-                                frame.width() as i32,
-                                frame.height() as i32,
-                                32,
-                            );
-                            let mut buffer = vec![0; buffer_size as usize];
-
-                            let frame_ptr = *frame.as_ptr();
-                            ffmpeg_sys_next::av_image_copy_to_buffer(
-                                buffer.as_mut_ptr(),
-                                buffer_size,
-                                frame_ptr.data.as_ptr() as *mut _,
-                                frame_ptr.linesize.as_ptr() as *mut _,
-                                frame.format().into(),
-                                frame_ptr.width,
-                                frame_ptr.height,
-                                32,
-                            );
-
-                            tx.send(buffer).expect("pushed");
-                        }
+                        tx.send(frame).expect("pushed");
+                        frame = ffmpeg_next::frame::Video::empty();
                     }
                 }
                 WebrtcEvent::Continue => {
@@ -116,7 +95,7 @@ pub async fn decode_recv_loop(mut client: Client, tx: mpsc::Sender<Vec<u8>>) {
 }
 
 pub async fn subscribe_as_client(
-    tx: mpsc::Sender<Vec<u8>>,
+    tx: mpsc::Sender<ffmpeg_next::frame::Video>,
     publish_url: &str,
     token: Option<String>,
 ) {
@@ -131,7 +110,7 @@ pub async fn subscribe_as_client(
     });
 }
 
-pub fn subscribe_as_server(tx: mpsc::Sender<Vec<u8>>, offer: String) -> String {
+pub fn subscribe_as_server(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String) -> String {
     let mut client = executor::block_on(Client::new()).expect("Ok");
     let answer = client.accept_whip_request(offer).expect("Ok");
     tokio::task::spawn(async move {
