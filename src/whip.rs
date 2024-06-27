@@ -27,18 +27,12 @@ pub async fn publish(
     loop {
         match client.recv().await {
             Ok(event) => match event {
-                WebrtcEvent::Connected => {
-                    info!("connected");
-                }
                 WebrtcEvent::Disconnected => {
                     info!("disconnected");
                     break;
                 }
-                WebrtcEvent::Stats(stats) => {
-                    info!("stats: {:?}", stats);
-                }
-                WebrtcEvent::Media(media) => {
-                    info!("media: {:?}", media);
+                WebrtcEvent::Media(_) => {
+                    panic!("Publisher incorrectly has incoming media");
                 }
                 WebrtcEvent::Continue => loop {
                     let packet = packet_rx.try_recv();
@@ -71,15 +65,9 @@ pub async fn decode_recv_loop(mut client: Client, tx: mpsc::Sender<Vec<u8>>) {
     loop {
         match client.recv().await {
             Ok(event) => match event {
-                WebrtcEvent::Connected => {
-                    info!("connected");
-                }
                 WebrtcEvent::Disconnected => {
                     info!("disconnected");
                     break;
-                }
-                WebrtcEvent::Stats(stats) => {
-                    info!("stats: {:?}", stats);
                 }
                 WebrtcEvent::Media(media) => {
                     // Decoder failures may happen, ignore them

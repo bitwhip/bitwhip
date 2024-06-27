@@ -14,7 +14,6 @@ use str0m::{
     format::Codec,
     media::{Direction as RtcDirection, MediaData, MediaKind, MediaTime, Mid},
     net::{Protocol, Receive},
-    stats::PeerStats,
     Candidate, Event, IceConnectionState, Input, Output, Rtc,
 };
 use tokio::net::UdpSocket;
@@ -29,8 +28,6 @@ pub struct WhipClaims {
 #[derive(Debug)]
 pub enum WebrtcEvent {
     Continue,
-    Connected,
-    Stats(PeerStats),
     Media(MediaData),
     Disconnected,
 }
@@ -221,7 +218,8 @@ impl Client {
         {
             Output::Event(event) => match event {
                 Event::Connected => {
-                    return Ok(WebrtcEvent::Connected);
+                    info!("connected");
+                    return Ok(WebrtcEvent::Continue);
                 }
                 Event::IceConnectionStateChange(state) => {
                     info!("ice connection state change: {:?}", state);
@@ -239,7 +237,8 @@ impl Client {
                     return Ok(WebrtcEvent::Continue);
                 }
                 Event::PeerStats(stats) => {
-                    return Ok(WebrtcEvent::Stats(stats));
+                    info!("stats: {:?}", stats);
+                    return Ok(WebrtcEvent::Continue);
                 }
                 Event::MediaData(media) => {
                     return Ok(WebrtcEvent::Media(media));
