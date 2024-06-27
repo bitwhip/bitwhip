@@ -4,6 +4,7 @@ use reqwest::header::{HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGE
 use serde::Deserialize;
 use std::{
     error::Error,
+    io::ErrorKind,
     net::{IpAddr, SocketAddr, SocketAddrV4},
     str::FromStr,
     time::{Duration, Instant},
@@ -134,15 +135,10 @@ impl Client {
             headers.append(AUTHORIZATION, authoriation_value);
         }
 
-        headers.append(
-            CONTENT_TYPE,
-            HeaderValue::from_str("application/sdp").unwrap(),
-        );
-        headers.append(
-            USER_AGENT,
-            HeaderValue::from_str("lambda-test-client").unwrap(),
-        );
+        headers.append(CONTENT_TYPE, HeaderValue::from_str("application/sdp").unwrap());
         headers.append(ACCEPT, HeaderValue::from_str("application/sdp").unwrap());
+        headers.append(USER_AGENT, HeaderValue::from_str("bitwhip").unwrap());
+
 
         let client = reqwest::Client::builder()
             .default_headers(headers)
@@ -193,13 +189,10 @@ impl Client {
             .await
             .map_err(|e| WebrtcError::ServerError(e.into()))?;
 
-        // remove a=framerate\n because it causes parsing problems
-        let answer = answer.replace("a=framerate:60\n", "");
-        let answer = SdpAnswer::from_sdp_string(&answer).map_err(|_| WebrtcError::SdpError)?;
 
         self.rtc
             .sdp_api()
-            .accept_answer(pending, answer)
+            .accept_answer(pending, SdpAnswer::from_sdp_string(&answer).map_err(|_| WebrtcError::SdpError)?)
             .map_err(|_| WebrtcError::SdpError)?;
 
         Ok(())
@@ -309,9 +302,12 @@ impl Client {
                     },
                 )
             }
-            Ok(Err(e)) => {
-                error!("[TransportWebrtc] network error {:?}", e);
+            Ok(Err(e)) => match e.kind() {
+                ErrorKind::ConnectionReset =>return Ok(WebrtcEvent::Continue),
+                _ => {
+                 error!("[TransportWebrtc] network error {:?}", e);
                 return Err(WebrtcError::NetworkError(e.into()));
+               }
             }
             Err(_e) => {
                 // Expected error for set_read_timeout().
