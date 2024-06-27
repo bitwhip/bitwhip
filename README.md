@@ -55,6 +55,8 @@ After running this open https://b.siobud.com/publish/bitwhip and your video shou
 
 ### Stream
 
+**Currently only Windows with NVIDIA cards are supported, more to be added**
+
 Stream captures your local desktop and publish via WHIP. To run this you need a URL and a Bearer Token.
 Below is an example of pushing to https://b.siobud.com/ with a Bearer Token of `bitwhip`
 
