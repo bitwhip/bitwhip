@@ -12,11 +12,13 @@ BitWHIP is your swiss army knife for low latency screen sharing. With BitWHIP yo
 This video can be sent P2P or to a server. You can watch your BitWHIP generated stream in BitWHIP or on your browser, phone, tv 
 or even your car!
 
-BitWHIP is built on open protocols so should work pretty much anywhere.  BitWHIP uses WHIP so it can be sent to [Broadcast Box][discord-invite-url], 
+BitWHIP is built on open protocols so should work pretty much anywhere. BitWHIP uses WHIP so it can be sent to [Broadcast Box][https://github.com/glimesh/broadcast-box], 
 Twitch, Cloudflare or any WHIP server of your choice. It should also interop with your favorite tools and libraries like
 OBS, FFmpeg or GStreamer.
 
 ## Building
+BitWHIP uses [just](https://github.com/casey/just) to make installing dependencies and building easier. To build
+this project first you install `just` and then execute `install-deps`.
 
 ### Install Just
 `cargo install just`
@@ -24,11 +26,41 @@ OBS, FFmpeg or GStreamer.
 ### Install dependencies
 `just install-deps`
 
-### Run
-`just run`
-
-
 ## Using
+Now that you have built you have three different paths.
+
+### Stream
+
+Stream captures your local desktop and publish via WHIP. To run this you need a URL and a Bearer Token.
+Below is an example of pushing to https://b.siobud.com/ with a Bearer Token of `bitwhip`
+
+```
+just run stream https://b.siobud.com/api/whip bitwhip
+```
+
+### Play WHIP
+
+Play WHIP starts a local WHIP server that clients can push too. You can use this to push video from BitWHIP
+or other WHIP clients like [OBS](https://obsproject.com/) or [GStreamer](https://gstreamer.freedesktop.org/).
+
+```
+just run play whip
+```
+
+The WHIP client would use a URL of `http://localhost:1337/` and any Bearer Token you like. You can stream to
+it via BitWHIP by running `just run stream http://localhost:1337/ bitwhip`.
+
+
+### Play WHEP
+
+Play WHEP connects to a WHEP server and plays video. Below is an example of pulling from https://b.siobud.com/ with
+a Bearer Token of `bitwhip`
+
+```
+just run play-whep https://b.siobud.com/api/whep bitwhip
+```
+
+After running this open https://b.siobud.com/publish/bitwhip and your video should open in a native player.
 
 
 [Join the Discord][discord-invite-url] and we are ready to help!
