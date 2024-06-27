@@ -29,15 +29,6 @@ this project first you install `just` and then execute `install-deps`.
 ## Using
 Now that you have built you have three different paths.
 
-### Stream
-
-Stream captures your local desktop and publish via WHIP. To run this you need a URL and a Bearer Token.
-Below is an example of pushing to https://b.siobud.com/ with a Bearer Token of `bitwhip`
-
-```
-just run stream https://b.siobud.com/api/whip bitwhip
-```
-
 ### Play WHIP
 
 Play WHIP starts a local WHIP server that clients can push too. You can use this to push video from BitWHIP
@@ -62,6 +53,14 @@ just run play-whep https://b.siobud.com/api/whep bitwhip
 
 After running this open https://b.siobud.com/publish/bitwhip and your video should open in a native player.
 
+### Stream
+
+Stream captures your local desktop and publish via WHIP. To run this you need a URL and a Bearer Token.
+Below is an example of pushing to https://b.siobud.com/ with a Bearer Token of `bitwhip`
+
+```
+just run stream https://b.siobud.com/api/whip bitwhip
+```
 
 [Join the Discord][discord-invite-url] and we are ready to help!
 
