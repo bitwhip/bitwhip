@@ -61,6 +61,8 @@ impl Client {
             .clear_codecs()
             .enable_h264(true)
             .set_stats_interval(Some(Duration::from_secs(2)))
+            .set_reordering_size_video(1)
+            .set_reordering_size_audio(1)
             .build();
 
         info!("local socket address: {:?}", socket.local_addr());
