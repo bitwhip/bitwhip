@@ -96,6 +96,10 @@ struct Cli {
     #[command(subcommand)]
     commands: Commands,
 
+    /// Force loopback candidates
+    #[clap(short, global = true, default_value_t = false)]
+    loopback: bool,
+
     /// Increase log verbosity, multiple occurrences (-vvv) further increase
     #[clap(short, global = true, action = clap::ArgAction::Count)]
     verbose: u8,
@@ -155,15 +159,15 @@ async fn main() -> Result<(), Error> {
             url,
             capture_method,
             token,
-        } => stream(url, capture_method, token).await?,
-        Commands::PlayWHIP {} => play_whip().await,
-        Commands::PlayWHEP { url, token } => play_whep(url, token).await?,
+        } => stream(url, capture_method, token, args.loopback).await?,
+        Commands::PlayWHIP {} => play_whip(args.loopback).await,
+        Commands::PlayWHEP { url, token } => play_whep(url, token, args.loopback).await?,
     }
 
     Ok(())
 }
 
-async fn stream(url: String, capture_method: CaptureMethod, token: Option<String>) -> Result<()> {
+async fn stream(url: String, capture_method: CaptureMethod, token: Option<String>, force_loopback: bool) -> Result<()> {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
     let join_handle = tokio::task::spawn_blocking(move || -> Result<()> {
@@ -218,7 +222,7 @@ async fn stream(url: String, capture_method: CaptureMethod, token: Option<String
         }
     });
 
-    whip::publish(&url, token, rx).await;
+    whip::publish(&url, token, rx, force_loopback).await;
     join_handle.await??;
 
     Ok(())
@@ -227,8 +231,9 @@ async fn stream(url: String, capture_method: CaptureMethod, token: Option<String
 async fn whip_handler(
     tx: mpsc::Sender<ffmpeg_next::frame::Video>,
     offer: String,
+    force_loopback: bool
 ) -> Response<String> {
-    let answer = whip::subscribe_as_server(tx, offer);
+    let answer = whip::subscribe_as_server(tx, offer, force_loopback);
     Response::builder()
         .status(201)
         .header("Location", "/")
@@ -236,7 +241,7 @@ async fn whip_handler(
         .unwrap()
 }
 
-async fn play_whip() {
+async fn play_whip(force_loopback: bool) {
     println!("Listening for WHIP Requests on 0.0.0.0:1337");
     let (tx, rx): (
         mpsc::Sender<ffmpeg_next::frame::Video>,
@@ -246,7 +251,7 @@ async fn play_whip() {
     tokio::task::spawn(async move {
         axum::serve(
             tokio::net::TcpListener::bind("0.0.0.0:1337").await.unwrap(),
-            Router::new().route("/", post(move |offer: String| whip_handler(tx, offer))),
+            Router::new().route("/", post(move |offer: String| whip_handler(tx, offer, force_loopback))),
         )
         .await
         .unwrap();
@@ -255,13 +260,13 @@ async fn play_whip() {
     render_video(rx);
 }
 
-async fn play_whep(url: String, token: Option<String>) -> Result<()> {
+async fn play_whep(url: String, token: Option<String>, force_loopback: bool) -> Result<()> {
     let (tx, rx): (
         mpsc::Sender<ffmpeg_next::frame::Video>,
         mpsc::Receiver<ffmpeg_next::frame::Video>,
     ) = mpsc::channel();
 
-    whip::subscribe_as_client(tx, &url, token).await;
+    whip::subscribe_as_client(tx, &url, token, force_loopback).await;
     render_video(rx);
 
     Ok(())

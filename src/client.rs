@@ -52,7 +52,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new() -> Result<Self, WebrtcError> {
+    pub async fn new(force_loopback: bool) -> Result<Self, WebrtcError> {
         let socket = UdpSocket::bind("0.0.0.0:0".parse::<SocketAddrV4>().unwrap())
             .await
             .expect("Should bind udp socket");
@@ -74,12 +74,12 @@ impl Client {
                 info!("iface: {} / {:?}", name, ip);
                 match ip {
                     IpAddr::V4(ip4) => {
-                        if !ip4.is_loopback() && !ip4.is_link_local() {
+                        if (force_loopback && ip4.is_loopback())
+                            || (!ip4.is_loopback() && !ip4.is_link_local())
+                        {
                             let socket_addr =
                                 SocketAddr::new(ip, socket.local_addr().unwrap().port());
-                            if socket_addr.to_string().starts_with("192") {
-                                local_socket_addr = Some(socket_addr.clone());
-                            }
+                            local_socket_addr = Some(socket_addr.clone());
                             rtc.add_local_candidate(
                                 Candidate::host(socket_addr, str0m::net::Protocol::Udp)
                                     .expect("Failed to create local candidate"),

@@ -74,6 +74,24 @@ Below is an example of pushing to https://b.siobud.com/ with a Bearer Token of `
 ```
 just run stream https://b.siobud.com/api/whip bitwhip
 ```
+
+### Help
+
+```
+Usage: bitwhip [OPTIONS] <COMMAND>
+
+Commands:
+  stream     Stream to a WHIP destination
+  play-whip  Start a WHIP server that accepts incoming requests
+  play-whep  Play from a WHEP destination
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -l          Force loopback candidates
+  -v...       Increase log verbosity, multiple occurrences (-vvv) further increase
+  -h, --help  Print help
+  ```
+
 ## TODO
 
 * [ ] Create binaries

@@ -11,13 +11,14 @@ pub async fn publish(
     publish_url: &str,
     token: Option<String>,
     mut packet_rx: UnboundedReceiver<EncodedPacket>,
+    force_loopback: bool
 ) {
     info!(
         "creating client to push to {} with token: {:?}",
         publish_url, token
     );
 
-    let mut client = Client::new().await.unwrap();
+    let mut client = Client::new(force_loopback).await.unwrap();
     client
         .send_whip_request(&publish_url, &token, RtcDirection::SendOnly)
         .await
@@ -92,8 +93,9 @@ pub async fn subscribe_as_client(
     tx: mpsc::Sender<ffmpeg_next::frame::Video>,
     publish_url: &str,
     token: Option<String>,
+    force_loopback: bool
 ) {
-    let mut client = Client::new().await.unwrap();
+    let mut client = Client::new(force_loopback).await.unwrap();
     client
         .send_whip_request(&publish_url, &token, RtcDirection::RecvOnly)
         .await
@@ -104,8 +106,8 @@ pub async fn subscribe_as_client(
     });
 }
 
-pub fn subscribe_as_server(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String) -> String {
-    let mut client = executor::block_on(Client::new()).expect("Ok");
+pub fn subscribe_as_server(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String, force_loopback: bool) -> String {
+    let mut client = executor::block_on(Client::new(force_loopback)).expect("Ok");
     let answer = client.accept_whip_request(offer).expect("Ok");
     tokio::task::spawn(async move {
         decode_recv_loop(client, tx).await;
