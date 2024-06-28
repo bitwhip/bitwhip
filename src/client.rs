@@ -74,7 +74,7 @@ impl Client {
                 info!("iface: {} / {:?}", name, ip);
                 match ip {
                     IpAddr::V4(ip4) => {
-                        if !ip4.is_loopback() && !ip4.is_link_local() {
+                        if ip4.is_loopback() {
                             let socket_addr =
                                 SocketAddr::new(ip, socket.local_addr().unwrap().port());
                             local_socket_addr = Some(socket_addr.clone());
