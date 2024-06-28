@@ -12,7 +12,7 @@ BitWHIP is your swiss army knife for low latency screen sharing. With BitWHIP yo
 This video can be sent P2P or to a server. You can watch your BitWHIP generated stream in BitWHIP or on your browser, phone, tv 
 or even your car!
 
-BitWHIP is built on open protocols so should work pretty much anywhere. BitWHIP uses WHIP so it can be sent to [Broadcast Box][https://github.com/glimesh/broadcast-box], 
+BitWHIP is built on open protocols so should work pretty much anywhere. BitWHIP uses WHIP so it can be sent to [Broadcast Box][broadcast-box-url], 
 Twitch, Cloudflare or any WHIP server of your choice. It should also interop with your favorite tools and libraries like
 OBS, FFmpeg or GStreamer.
 
