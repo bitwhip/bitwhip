@@ -14,7 +14,8 @@
 BitWHIP is a CLI WebRTC Agent written in Rust. These are some of the things you can do with it today.
 
 * Publish your desktop with 30ms of latency
-* Pull and Play WebRTC video from
+* Play the stream in a native player
+* Pull WebRTC video from other sources and play
   * [Broadcast Box][broadcast-box-url]
   * [IVS](https://aws.amazon.com/ivs/)
   * [Cloudflare](https://developers.cloudflare.com/stream/webrtc-beta/)
@@ -24,7 +25,7 @@ BitWHIP is a CLI WebRTC Agent written in Rust. These are some of the things you 
   * any services that support [WHIP](https://datatracker.ietf.org/doc/draft-ietf-wish-whip/)/[WHEP](https://datatracker.ietf.org/doc/draft-murillo-whep/)!
 
 BitWHIP is built on open protocols so should work pretty much anywhere. It should also interop with your
-favorite tools and libraries like OBS, FFmpeg or GStreamer. 
+favorite tools and libraries like OBS, FFmpeg or GStreamer.
 
 ## Building
 BitWHIP uses [just](https://github.com/casey/just) to make installing dependencies and building easier. To build
