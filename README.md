@@ -4,17 +4,27 @@
 [![Discord][discord-image]][discord-invite-url]
 
 - [What is BitWHIP](#what-is-bitwhip)
+- [Building](#building)
 - [Using](#using)
+- [TODO](#todo)
+- [More](#more)
 
 ## What is BitWHIP
 
-BitWHIP is your swiss army knife for low latency screen sharing. With BitWHIP you can publish your desktop with 30ms of latency.
-This video can be sent P2P or to a server. You can watch your BitWHIP generated stream in BitWHIP or on your browser, phone, tv 
-or even your car!
+BitWHIP is a CLI WebRTC Agent written in Rust. These are some of the things you can do with it today.
 
-BitWHIP is built on open protocols so should work pretty much anywhere. BitWHIP uses WHIP so it can be sent to [Broadcast Box][broadcast-box-url], 
-Twitch, Cloudflare or any WHIP server of your choice. It should also interop with your favorite tools and libraries like
-OBS, FFmpeg or GStreamer.
+* Publish your desktop with 30ms of latency
+* Pull and Play WebRTC video from
+  * [Broadcast Box][broadcast-box-url]
+  * [IVS](https://aws.amazon.com/ivs/)
+  * [Cloudflare](https://developers.cloudflare.com/stream/webrtc-beta/)
+  * [Dolby.io](https://docs.dolby.io/streaming-apis/reference/whip_whippublish)
+  * [Red5](https://www.red5.net/docs/special/user-guide/whip-whep-configuration/)
+  * [Nimble Streamer](https://softvelum.com/nimble/)
+  * any services that support [WHIP](https://datatracker.ietf.org/doc/draft-ietf-wish-whip/)/[WHEP](https://datatracker.ietf.org/doc/draft-murillo-whep/)!
+
+BitWHIP is built on open protocols so should work pretty much anywhere. It should also interop with your
+favorite tools and libraries like OBS, FFmpeg or GStreamer. 
 
 ## Building
 BitWHIP uses [just](https://github.com/casey/just) to make installing dependencies and building easier. To build
@@ -63,6 +73,20 @@ Below is an example of pushing to https://b.siobud.com/ with a Bearer Token of `
 ```
 just run stream https://b.siobud.com/api/whip bitwhip
 ```
+## TODO
+
+* [ ] Create binaries
+* [ ] Improve Build System
+* Support more Capture
+  * [ ] gdigrab (Windows)
+  * [ ] x11grab (Linux)
+* Support more Encoding
+  * [ ] QuickSync
+  * [ ] x264
+
+## More
+
+[Selkies-GStreamer](https://github.com/selkies-project/selkies-gstreamer) is a WebRTC remote desktop streaming implementation that has achieved 0-16ms of latency.
 
 [Join the Discord][discord-invite-url] and we are ready to help!
 
