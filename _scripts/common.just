@@ -10,6 +10,8 @@ ExtDir := ProjectDir / "ext"
 FFmpeg := if os() == "windows" { "ffmpeg-n7.0-latest-win64-gpl-shared-7.0"
    } else if os() + arch() == "macosaarch64" { "ffmpeg-arm64"
    } else if os() + arch() == "macosx86_64"  { "ffmpeg-x64_64"
+   } else if os() + arch() == "linuxaarch64" { "ffmpeg-n7.0-latest-linuxarm64-gpl-shared-7.0"
+   } else if os() + arch() == "linuxx86_64"  { "ffmpeg-n7.0-latest-linux64-gpl-shared-7.0"
    } else                      { "ffmpeg-7.0-linux-clang-gpl-lite" }
 export FFMPEG_DIR := ProjectDir / "ext" / FFmpeg
 
