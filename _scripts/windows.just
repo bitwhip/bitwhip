@@ -21,7 +21,7 @@ install-deps:
     if (-not (Test-Path -Path "{{FFmpeg}}")) {
         echo "Downloading {{FFmpeg}}"
         wget "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/{{FFmpeg}}.zip" -outfile "{{FFmpeg}}.zip"
-        7z x -y {{FFmpeg}}.zip
+        Expand-Archive {{FFmpeg}}.zip
         del {{FFmpeg}}.zip
     }
 
