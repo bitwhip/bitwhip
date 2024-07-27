@@ -21,8 +21,10 @@ install-deps:
     if (-not (Test-Path -Path "{{FFmpeg}}")) {
         echo "Downloading {{FFmpeg}}"
         wget "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/{{FFmpeg}}.zip" -outfile "{{FFmpeg}}.zip"
-        Expand-Archive {{FFmpeg}}.zip
+        Expand-Archive {{FFmpeg}}.zip temp-nested-folder
+        Move-Item temp-nested-folder/{{FFmpeg}} {{FFmpeg}}
         del {{FFmpeg}}.zip
+        del temp-nested-folder
     }
 
     # OpenSSL
