@@ -34,4 +34,4 @@ ffmpeg-sys-next = "7.0.0"
 
 [target.'cfg(windows)'.dependencies]
 dxfilter = "0.5.13"
-rhinostream = { path = "../rhinostream-rs" }
+rhinostream = { git = "https://github.com/bitwhip/rhinostream-rs.git", rev = "c905d42c7575b700cacbc7cdcda027f99c423ee4" }

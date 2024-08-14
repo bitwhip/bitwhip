@@ -20,7 +20,7 @@ impl Rhino {
         let mut ctx = Context::None;
         let src = DxDesktopDuplication::new("--screen 0".parse().unwrap(), &mut ctx).unwrap();
         let filter = new_nv12_filter("-c rgb -r 1920x1080".parse().unwrap(), &mut ctx).unwrap();
-        let config: NvencConfig = "-p p4 --profile auto --multi-pass disabled --aq disabled -t \
+        let config: NvencConfig = "-p p1 --profile auto --multi-pass disabled --aq disabled -t \
             ultra_low_latency -r 1920x1080 --codec h264 --color argb -b 10000000 -f 60"
             .parse()
             .unwrap();
@@ -43,7 +43,7 @@ impl Source for Rhino {
         self.current_frame += 1;
 
         // Signal IDR roughly every 60 frames
-        if self.current_frame % 60 == 0 {
+        if self.current_frame % 120 == 0 {
             let _ = self.stream.signal(SignalType::Processor(1));
         }
 

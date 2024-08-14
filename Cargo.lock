@@ -1597,6 +1597,7 @@ dependencies = [
 [[package]]
 name = "nvenc-sys"
 version = "0.1.0"
+source = "git+https://github.com/bitwhip/rhinostream-rs.git?rev=c905d42c7575b700cacbc7cdcda027f99c423ee4#c905d42c7575b700cacbc7cdcda027f99c423ee4"
 dependencies = [
  "bindgen",
  "libloading",
@@ -1912,6 +1913,7 @@ dependencies = [
 [[package]]
 name = "rhinostream"
 version = "0.0.1"
+source = "git+https://github.com/bitwhip/rhinostream-rs.git?rev=c905d42c7575b700cacbc7cdcda027f99c423ee4#c905d42c7575b700cacbc7cdcda027f99c423ee4"
 dependencies = [
  "cbindgen",
  "clap 4.5.13",
