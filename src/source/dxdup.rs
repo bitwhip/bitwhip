@@ -1,4 +1,4 @@
-use super::Source;
+use super::{Source, SourceOutput};
 use anyhow::{anyhow, Result};
 use ffmpeg_next::{
     filter::{self, Graph},
@@ -25,10 +25,10 @@ impl DisplayDuplicator {
 }
 
 impl Source for DisplayDuplicator {
-    fn get_frame(&mut self) -> Result<frame::Video> {
+    fn get_frame(&mut self) -> Result<SourceOutput> {
         let mut frame = frame::Video::empty();
         self.graph.get("out").unwrap().sink().frame(&mut frame)?;
 
-        Ok(frame)
+        Ok(SourceOutput::RawFrame(frame))
     }
 }

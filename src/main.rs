@@ -1,17 +1,22 @@
 use crate::player::render_video;
 use anyhow::{Error, Result};
 use axum::{response::Response, routing::post, Router};
-use clap::{Parser, Subcommand};
+use bytes::Bytes;
+use clap::{Parser, Subcommand, ValueEnum};
 use encoder::Encoder;
 use ffmpeg_next::{
     ffi::{av_buffer_ref, AVBufferRef},
     format::Pixel,
-    Packet, Rational,
+    Rational,
 };
 use log::LevelFilter;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use source::Source;
-use std::{collections::HashMap, sync::mpsc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::mpsc,
+    time::{Duration, Instant},
+};
 
 mod client;
 mod encoder;
@@ -19,7 +24,10 @@ mod player;
 mod source;
 mod whip;
 
-struct EncodedPacket(Packet, Instant);
+struct EncodedPacket {
+    data: Bytes,
+    pts: Duration,
+}
 
 #[no_mangle]
 pub static NvOptimusEnablement: i32 = 1;
@@ -30,8 +38,9 @@ fn create_encoder(width: u32, height: u32, hw_frames: *mut AVBufferRef) -> Resul
     let encoder = Encoder::new(
         "h264_nvenc",
         Some(HashMap::from([
-            ("preset".into(), "p6".into()),
+            ("preset".into(), "llhp".into()),
             ("tune".into(), "ull".into()),
+            ("delay".into(), "0".into())
         ])),
         |encoder| {
             let frame_rate = Rational::new(60, 1);
@@ -55,12 +64,42 @@ fn create_encoder(width: u32, height: u32, hw_frames: *mut AVBufferRef) -> Resul
     Ok(encoder)
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+pub enum CaptureMethod {
+    #[cfg(target_os = "windows")]
+    DXGI,
+    #[cfg(target_os = "windows")]
+    RHINO,
+}
+
+impl CaptureMethod {
+    pub fn new(self) -> Result<Box<dyn Source + Send + Sync>> {
+        match self {
+            #[cfg(target_os = "windows")]
+            CaptureMethod::DXGI => Ok(Box::new(source::dxdup::DisplayDuplicator::new()?)),
+            #[cfg(target_os = "windows")]
+            CaptureMethod::RHINO => Ok(Box::new(source::rhino::Rhino::new()?)),
+        }
+    }
+}
+
+impl Default for CaptureMethod {
+    fn default() -> Self {
+        #[cfg(target_os = "windows")]
+        CaptureMethod::DXGI
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "bitwhip")]
 #[command(bin_name = "bitwhip")]
 struct Cli {
     #[command(subcommand)]
     commands: Commands,
+
+    /// Force loopback candidates
+    #[clap(short, global = true, default_value_t = false)]
+    loopback: bool,
 
     /// Increase log verbosity, multiple occurrences (-vvv) further increase
     #[clap(short, global = true, action = clap::ArgAction::Count)]
@@ -74,6 +113,10 @@ enum Commands {
     Stream {
         /// The WHIP URL
         url: String,
+
+        /// Capture method
+        #[clap(short, value_enum, default_value_t=CaptureMethod::default())]
+        capture_method: CaptureMethod,
 
         /// The WHIP bearer token
         token: Option<String>,
@@ -113,21 +156,24 @@ async fn main() -> Result<(), Error> {
     )?;
 
     match args.commands {
-        Commands::Stream { url, token } => stream(url, token).await?,
-        Commands::PlayWHIP {} => play_whip().await,
-        Commands::PlayWHEP { url, token } => play_whep(url, token).await?,
+        Commands::Stream {
+            url,
+            capture_method,
+            token,
+        } => stream(url, capture_method, token, args.loopback).await?,
+        Commands::PlayWHIP {} => play_whip(args.loopback).await,
+        Commands::PlayWHEP { url, token } => play_whep(url, token, args.loopback).await?,
     }
 
     Ok(())
 }
 
-async fn stream(url: String, token: Option<String>) -> Result<()> {
+async fn stream(url: String, capture_method: CaptureMethod, token: Option<String>, force_loopback: bool) -> Result<()> {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
     let join_handle = tokio::task::spawn_blocking(move || -> Result<()> {
         let mut encoder: Option<Encoder> = None;
-        let mut source: Box<dyn Source + Send + Sync> =
-            Box::new(source::dxdup::DisplayDuplicator::new()?);
+        let mut source: Box<dyn Source + Send + Sync> = capture_method.new()?;
 
         let ensure_encoder = |encoder: &mut Option<Encoder>,
                               width: u32,
@@ -146,28 +192,49 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
         };
         let start = Instant::now();
         loop {
-            // Pull frame from duplicator
+            // Pull frame from source
             let frame = source.get_frame()?;
-            let hw_frames = unsafe { (*frame.as_ptr()).hw_frames_ctx };
-            // Fetch encoder or create it
-            ensure_encoder(&mut encoder, frame.width(), frame.height(), hw_frames)?;
-            if let Some(encoder) = &mut encoder {
-                // Encode frame
-                if let Some(packet) = encoder.encode(&frame)? {
-                    tx.send(EncodedPacket(packet, start)).unwrap();
+
+            match frame {
+                source::SourceOutput::RawFrame(frame) => {
+                    let hw_frames = unsafe { (*frame.as_ptr()).hw_frames_ctx };
+                    // Fetch encoder or create it
+                    ensure_encoder(&mut encoder, frame.width(), frame.height(), hw_frames)?;
+                    if let Some(encoder) = &mut encoder {
+                        // Encode frame
+                        if let Some(packet) = encoder.encode(&frame)? {
+                            tx.send(EncodedPacket {
+                                data: Bytes::copy_from_slice(packet.data().unwrap()),
+                                pts: Instant::now() - start,
+                            })
+                            .unwrap();
+                        }
+                    }
+                }
+
+                source::SourceOutput::EncodedFrame(frame) => {
+                    tx.send(EncodedPacket {
+                        data: frame.data,
+                        pts: Instant::now() - start,
+                    })
+                    .unwrap();
                 }
             }
         }
     });
 
-    whip::publish(&url, token, rx).await;
+    whip::publish(&url, token, rx, force_loopback).await;
     join_handle.await??;
 
     Ok(())
 }
 
-async fn whip_handler(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String) -> Response<String> {
-    let answer = whip::subscribe_as_server(tx, offer);
+async fn whip_handler(
+    tx: mpsc::Sender<ffmpeg_next::frame::Video>,
+    offer: String,
+    force_loopback: bool
+) -> Response<String> {
+    let answer = whip::subscribe_as_server(tx, offer, force_loopback);
     Response::builder()
         .status(201)
         .header("Location", "/")
@@ -175,14 +242,17 @@ async fn whip_handler(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String
         .unwrap()
 }
 
-async fn play_whip() {
+async fn play_whip(force_loopback: bool) {
     println!("Listening for WHIP Requests on 0.0.0.0:1337");
-    let (tx, rx): (mpsc::Sender<ffmpeg_next::frame::Video>, mpsc::Receiver<ffmpeg_next::frame::Video>) = mpsc::channel();
+    let (tx, rx): (
+        mpsc::Sender<ffmpeg_next::frame::Video>,
+        mpsc::Receiver<ffmpeg_next::frame::Video>,
+    ) = mpsc::channel();
 
     tokio::task::spawn(async move {
         axum::serve(
             tokio::net::TcpListener::bind("0.0.0.0:1337").await.unwrap(),
-            Router::new().route("/", post(move |offer: String| whip_handler(tx, offer))),
+            Router::new().route("/", post(move |offer: String| whip_handler(tx, offer, force_loopback))),
         )
         .await
         .unwrap();
@@ -191,10 +261,13 @@ async fn play_whip() {
     render_video(rx);
 }
 
-async fn play_whep(url: String, token: Option<String>) -> Result<()> {
-    let (tx, rx): (mpsc::Sender<ffmpeg_next::frame::Video>, mpsc::Receiver<ffmpeg_next::frame::Video>) = mpsc::channel();
+async fn play_whep(url: String, token: Option<String>, force_loopback: bool) -> Result<()> {
+    let (tx, rx): (
+        mpsc::Sender<ffmpeg_next::frame::Video>,
+        mpsc::Receiver<ffmpeg_next::frame::Video>,
+    ) = mpsc::channel();
 
-    whip::subscribe_as_client(tx, &url, token).await;
+    whip::subscribe_as_client(tx, &url, token, force_loopback).await;
     render_video(rx);
 
     Ok(())
