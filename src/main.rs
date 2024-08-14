@@ -38,8 +38,9 @@ fn create_encoder(width: u32, height: u32, hw_frames: *mut AVBufferRef) -> Resul
     let encoder = Encoder::new(
         "h264_nvenc",
         Some(HashMap::from([
-            ("preset".into(), "p6".into()),
+            ("preset".into(), "llhp".into()),
             ("tune".into(), "ull".into()),
+            ("delay".into(), "0".into())
         ])),
         |encoder| {
             let frame_rate = Rational::new(60, 1);
