@@ -1,9 +1,8 @@
 use crate::client::{Client, WebrtcEvent};
 use crate::EncodedPacket;
-use bytes::Bytes;
 use ffmpeg_next;
 use futures::executor;
-use std::{sync::mpsc, time::Instant};
+use std::sync::mpsc;
 use str0m::media::Direction as RtcDirection;
 use tokio::sync::mpsc::{error::TryRecvError, UnboundedReceiver};
 use tracing::{error, info};
@@ -39,12 +38,7 @@ pub async fn publish(
                     match packet {
                         Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
                         Ok(packet) => {
-                            let pts = Instant::now() - packet.1;
-                            if let Some(data) = packet.0.data() {
-                                client
-                                    .send_video(Bytes::copy_from_slice(data), pts)
-                                    .unwrap();
-                            }
+                            client.send_video(packet.data, packet.pts).unwrap();
                         }
                     }
                 },

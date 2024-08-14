@@ -31,3 +31,7 @@ url = "2.5.0"
 axum = "0.7.5"
 sdl2 = { version = "0.37.0", features = ["bundled"] }
 ffmpeg-sys-next = "7.0.0"
+
+[target.'cfg(windows)'.dependencies]
+dxfilter = "0.5.13"
+rhinostream = { path = "../rhinostream-rs" }

@@ -1,0 +1,46 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run bitwhip",
+            "request": "launch",
+            "preLaunchTask": "Build bitwhip (Release)",
+            "program": "${workspaceFolder}/target/release/bitwhip",
+            "windows": {
+                "env": {
+                    "PATH": "${env:Path};${workspaceFolder}/ext/ffmpeg-n7.0-latest-win64-gpl-shared-7.0/bin"
+                }
+            },
+            "linux": {
+                "env": {
+                    "LD_LIBRARY_PATH": "${workspaceFolder}/ext/ffmpeg-n7.0-latest-linux64-gpl-shared-7.0/lib"
+                },
+            },
+            "cwd": "${workspaceFolder}",
+            "type": "lldb",
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "Debug bitwhip",
+            "request": "launch",
+            "preLaunchTask": "Build bitwhip (Debug)",
+            "program": "${workspaceFolder}/target/debug/bitwhip",
+            "windows": {
+                "env": {
+                    "PATH": "${env:Path};${workspaceFolder}/ext/ffmpeg-n7.0-latest-win64-gpl-shared-7.0/bin"
+                }
+            },
+            "linux": {
+                "env": {
+                    "LD_LIBRARY_PATH": "${workspaceFolder}/ext/ffmpeg-n7.0-latest-linux64-gpl-shared-7.0/lib"
+                },
+            },
+            "args": [
+                "stream", "-v", "-c", "rhino", "https://global.whip.live-video.net", "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCIsImtpZCI6ImFybjphd3M6aXZzOnVzLXdlc3QtMjo1ODQyNjAxMDU2OTQ6cHVibGljLWtleS9OMmVEMzJLcThScngifQ.eyJhdHRyaWJ1dGVzIjp7InBhcnRpY2lwYW50R3JvdXAiOiJ1c2VyIiwibmFtZSI6IkpvaG4gQnJhZGxleSIsImVtYWlsIjoiam9jYnJhZEBqdXN0aW4udHYiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTE9TNFdtX29JbXA1TVY4SVN3cnNyaUJrS3hUUE9keG1ndmFLZ3RhSFY3SmF1Z2ZnPXM5Ni1jIn0sImNhcGFiaWxpdGllcyI6eyJhbGxvd19wdWJsaXNoIjp0cnVlLCJhbGxvd19zdWJzY3JpYmUiOnRydWV9LCJ2ZXJzaW9uIjoiMS4wIiwidG9waWMiOiJXWTJGeTVwbDBuMjIiLCJyZXNvdXJjZSI6ImFybjphd3M6aXZzOnVzLXdlc3QtMjo1ODQyNjAxMDU2OTQ6c3RhZ2UvV1kyRnk1cGwwbjIyIiwianRpIjoiS05RYzJkRlNtbW1WIiwidXNlcl9pZCI6ImpvY2JyYWQiLCJ3aGlwX3VybCI6Imh0dHBzOi8vM2I0NjEzY2E3ODM3Lmdsb2JhbC1ibS53aGlwLmxpdmUtdmlkZW8ubmV0IiwiZXZlbnRzX3VybCI6IndzczovL2dsb2JhbC5ldmVudHMubGl2ZS12aWRlby5uZXQiLCJpYXQiOjE3MjM1OTE5MzMsImV4cCI6MTcyNDgwMTUzM30.lH-j0iPOyu4BMUAgQc069LCU1uv_18Jh6Q2fY9e1M_TbT59O-dRJ1uwvMWktJk8FzcJiGEYeliOGGAfaFDiYa90zM3bC9pfFd_WSjnIGdH-Kn3HFB7ljzyJyU79ZaLsV"
+            ],
+            "cwd": "${workspaceFolder}",
+            "type": "lldb",
+            "console": "integratedTerminal",
+        }
+    ]
+}

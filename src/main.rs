@@ -1,17 +1,22 @@
 use crate::player::render_video;
 use anyhow::{Error, Result};
 use axum::{response::Response, routing::post, Router};
-use clap::{Parser, Subcommand};
+use bytes::Bytes;
+use clap::{Parser, Subcommand, ValueEnum};
 use encoder::Encoder;
 use ffmpeg_next::{
     ffi::{av_buffer_ref, AVBufferRef},
     format::Pixel,
-    Packet, Rational,
+    Rational,
 };
 use log::LevelFilter;
 use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use source::Source;
-use std::{collections::HashMap, sync::mpsc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::mpsc,
+    time::{Duration, Instant},
+};
 
 mod client;
 mod encoder;
@@ -19,7 +24,10 @@ mod player;
 mod source;
 mod whip;
 
-struct EncodedPacket(Packet, Instant);
+struct EncodedPacket {
+    data: Bytes,
+    pts: Duration,
+}
 
 #[no_mangle]
 pub static NvOptimusEnablement: i32 = 1;
@@ -55,6 +63,32 @@ fn create_encoder(width: u32, height: u32, hw_frames: *mut AVBufferRef) -> Resul
     Ok(encoder)
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+pub enum CaptureMethod {
+    #[cfg(target_os = "windows")]
+    DXGI,
+    #[cfg(target_os = "windows")]
+    RHINO,
+}
+
+impl CaptureMethod {
+    pub fn new(self) -> Result<Box<dyn Source + Send + Sync>> {
+        match self {
+            #[cfg(target_os = "windows")]
+            CaptureMethod::DXGI => Ok(Box::new(source::dxdup::DisplayDuplicator::new()?)),
+            #[cfg(target_os = "windows")]
+            CaptureMethod::RHINO => Ok(Box::new(source::rhino::Rhino::new()?)),
+        }
+    }
+}
+
+impl Default for CaptureMethod {
+    fn default() -> Self {
+        #[cfg(target_os = "windows")]
+        CaptureMethod::DXGI
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "bitwhip")]
 #[command(bin_name = "bitwhip")]
@@ -74,6 +108,10 @@ enum Commands {
     Stream {
         /// The WHIP URL
         url: String,
+
+        /// Capture method
+        #[clap(short, value_enum, default_value_t=CaptureMethod::default())]
+        capture_method: CaptureMethod,
 
         /// The WHIP bearer token
         token: Option<String>,
@@ -113,7 +151,11 @@ async fn main() -> Result<(), Error> {
     )?;
 
     match args.commands {
-        Commands::Stream { url, token } => stream(url, token).await?,
+        Commands::Stream {
+            url,
+            capture_method,
+            token,
+        } => stream(url, capture_method, token).await?,
         Commands::PlayWHIP {} => play_whip().await,
         Commands::PlayWHEP { url, token } => play_whep(url, token).await?,
     }
@@ -121,13 +163,12 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-async fn stream(url: String, token: Option<String>) -> Result<()> {
+async fn stream(url: String, capture_method: CaptureMethod, token: Option<String>) -> Result<()> {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
     let join_handle = tokio::task::spawn_blocking(move || -> Result<()> {
         let mut encoder: Option<Encoder> = None;
-        let mut source: Box<dyn Source + Send + Sync> =
-            Box::new(source::dxdup::DisplayDuplicator::new()?);
+        let mut source: Box<dyn Source + Send + Sync> = capture_method.new()?;
 
         let ensure_encoder = |encoder: &mut Option<Encoder>,
                               width: u32,
@@ -146,15 +187,32 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
         };
         let start = Instant::now();
         loop {
-            // Pull frame from duplicator
+            // Pull frame from source
             let frame = source.get_frame()?;
-            let hw_frames = unsafe { (*frame.as_ptr()).hw_frames_ctx };
-            // Fetch encoder or create it
-            ensure_encoder(&mut encoder, frame.width(), frame.height(), hw_frames)?;
-            if let Some(encoder) = &mut encoder {
-                // Encode frame
-                if let Some(packet) = encoder.encode(&frame)? {
-                    tx.send(EncodedPacket(packet, start)).unwrap();
+
+            match frame {
+                source::SourceOutput::RawFrame(frame) => {
+                    let hw_frames = unsafe { (*frame.as_ptr()).hw_frames_ctx };
+                    // Fetch encoder or create it
+                    ensure_encoder(&mut encoder, frame.width(), frame.height(), hw_frames)?;
+                    if let Some(encoder) = &mut encoder {
+                        // Encode frame
+                        if let Some(packet) = encoder.encode(&frame)? {
+                            tx.send(EncodedPacket {
+                                data: Bytes::copy_from_slice(packet.data().unwrap()),
+                                pts: Instant::now() - start,
+                            })
+                            .unwrap();
+                        }
+                    }
+                }
+
+                source::SourceOutput::EncodedFrame(frame) => {
+                    tx.send(EncodedPacket {
+                        data: frame.data,
+                        pts: Instant::now() - start,
+                    })
+                    .unwrap();
                 }
             }
         }
@@ -166,7 +224,10 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
     Ok(())
 }
 
-async fn whip_handler(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String) -> Response<String> {
+async fn whip_handler(
+    tx: mpsc::Sender<ffmpeg_next::frame::Video>,
+    offer: String,
+) -> Response<String> {
     let answer = whip::subscribe_as_server(tx, offer);
     Response::builder()
         .status(201)
@@ -177,7 +238,10 @@ async fn whip_handler(tx: mpsc::Sender<ffmpeg_next::frame::Video>, offer: String
 
 async fn play_whip() {
     println!("Listening for WHIP Requests on 0.0.0.0:1337");
-    let (tx, rx): (mpsc::Sender<ffmpeg_next::frame::Video>, mpsc::Receiver<ffmpeg_next::frame::Video>) = mpsc::channel();
+    let (tx, rx): (
+        mpsc::Sender<ffmpeg_next::frame::Video>,
+        mpsc::Receiver<ffmpeg_next::frame::Video>,
+    ) = mpsc::channel();
 
     tokio::task::spawn(async move {
         axum::serve(
@@ -192,7 +256,10 @@ async fn play_whip() {
 }
 
 async fn play_whep(url: String, token: Option<String>) -> Result<()> {
-    let (tx, rx): (mpsc::Sender<ffmpeg_next::frame::Video>, mpsc::Receiver<ffmpeg_next::frame::Video>) = mpsc::channel();
+    let (tx, rx): (
+        mpsc::Sender<ffmpeg_next::frame::Video>,
+        mpsc::Receiver<ffmpeg_next::frame::Video>,
+    ) = mpsc::channel();
 
     whip::subscribe_as_client(tx, &url, token).await;
     render_video(rx);

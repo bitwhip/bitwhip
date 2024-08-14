@@ -77,7 +77,9 @@ impl Client {
                         if !ip4.is_loopback() && !ip4.is_link_local() {
                             let socket_addr =
                                 SocketAddr::new(ip, socket.local_addr().unwrap().port());
-                            local_socket_addr = Some(socket_addr.clone());
+                            if socket_addr.to_string().starts_with("192") {
+                                local_socket_addr = Some(socket_addr.clone());
+                            }
                             rtc.add_local_candidate(
                                 Candidate::host(socket_addr, str0m::net::Protocol::Udp)
                                     .expect("Failed to create local candidate"),
@@ -281,6 +283,9 @@ impl Client {
                 }
             };
         }
+
+        // Maximum delay is 1ms
+        let duration = duration.min(Duration::from_millis(1));
 
         let input = match tokio::time::timeout(duration, self.socket.recv_from(&mut self.buf)).await
         {
