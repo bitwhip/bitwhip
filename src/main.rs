@@ -160,8 +160,12 @@ async fn stream(url: String, token: Option<String>) -> Result<()> {
         }
     });
 
-    whip::publish(&url, token, rx).await;
-    join_handle.await??;
+    tokio::select! {
+        _ = whip::publish(&url, token, rx) => {},
+        res = join_handle => {
+            res??
+        }
+    }
 
     Ok(())
 }
